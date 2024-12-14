@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from scipy.stats import ks_2samp
 from sklearn.experimental import enable_iterative_imputer  # Enable IterativeImputer
 from sklearn.impute import IterativeImputer
@@ -22,37 +20,24 @@ if uploaded_file:
     st.write("### Raw Data Preview")
     st.dataframe(df.head())
 
-    # Validation 1: Check for essential columns
+    # Step 1: Check for Essential Columns
     essential_columns = ['Site Num', 'Year', 'pH', 'TC %', 'TN %', 'Olsen P', 'AMN', 'BD']
     missing_columns = [col for col in essential_columns if col not in df.columns]
     if missing_columns:
         st.error(f"The uploaded dataset is missing essential columns: {missing_columns}")
         st.stop()
-    else:
-        st.success("All essential columns are present.")
 
-    # Display dataset info
+    # Step 2: Display Basic Information
     st.write("### Dataset Info")
-    st.write("Number of rows and columns:", df.shape)
-    st.write("### Missing Values in Each Column")
+    st.write("Shape:", df.shape)
+    st.write("Missing Values:")
     st.write(df.isnull().sum())
 
-    # Step 1: Handle Missing Values in Critical Columns
+    # Step 3: Handle Missing Values in Critical Columns
     critical_columns = ['pH', 'TC %', 'TN %', 'Olsen P', 'AMN', 'BD']
     df_cleaned = df.dropna(subset=critical_columns, how='any')
     rows_removed = len(df) - len(df_cleaned)
     st.write(f"### Removed {rows_removed} rows with missing values in critical columns.")
-
-    # Step 2: Remove Duplicate Rows
-    initial_rows = len(df_cleaned)
-    df_cleaned.drop_duplicates(inplace=True)
-    st.write(f"### Removed {initial_rows - len(df_cleaned)} duplicate rows.")
-
-    # Step 3: Extract Sample Count
-    if 'Site No.1' in df_cleaned.columns:
-        df_cleaned['Sample Count'] = df_cleaned['Site No.1'].str.extract(r'-(\d{2})$').astype(float)
-        st.write("### Extracted Sample Count")
-        st.dataframe(df_cleaned[['Site No.1', 'Sample Count']].head())
 
     # Step 4: Assign Periods Based on Year
     conditions = [
@@ -66,12 +51,6 @@ if uploaded_file:
     st.write("### Assigned Periods")
     st.dataframe(df_cleaned[['Year', 'Period']].head())
 
-    # Validation 2: Check unassigned periods
-    unassigned_periods = df_cleaned[df_cleaned['Period'] == 'Unknown']
-    if not unassigned_periods.empty:
-        st.warning(f"{len(unassigned_periods)} rows have an unassigned period. Please verify the year range.")
-        st.dataframe(unassigned_periods)
-
     # Step 5: Handle "<" Values in Trace Element Columns
     trace_elements = ['As', 'Cd', 'Cr', 'Cu', 'Ni', 'Pb', 'Zn']
     for column in trace_elements:
@@ -82,46 +61,36 @@ if uploaded_file:
     st.write("### Updated Columns After Handling '<' Values")
     st.dataframe(df_cleaned[trace_elements].head())
 
-    # Step 6: Impute Missing Values Using IterativeImputer with Random Forest
-    st.write("### Imputation Using IterativeImputer with Random Forest")
-    non_predictive_columns = ['Site No.1', 'Site Num', 'Year', 'Sample Count', 'Period']
-    df_for_imputation = df_cleaned.drop(columns=non_predictive_columns, errors="ignore")
-
-    # Impute only numerical columns
-    numeric_columns = df_for_imputation.select_dtypes(include=['number']).columns.tolist()
+    # Step 6: Impute Missing Values Using IterativeImputer
+    st.write("### Imputation Using IterativeImputer")
+    numeric_columns = df_cleaned.select_dtypes(include=['number']).columns.tolist()
     imputer = IterativeImputer(
-        estimator=RandomForestRegressor(n_estimators=50, random_state=0),
+        estimator=RandomForestRegressor(n_estimators=10, random_state=0),
         max_iter=5,
         random_state=0
     )
-    imputed_data = imputer.fit_transform(df_for_imputation[numeric_columns])
-    df_for_imputation[numeric_columns] = imputed_data
-
-    # Reattach non-predictive columns to the imputed dataset
-    df_final = pd.concat([df_cleaned[non_predictive_columns].reset_index(drop=True), df_for_imputation], axis=1)
-    st.write("### Dataset After Imputation")
-    st.dataframe(df_final.head())
+    df_cleaned[numeric_columns] = imputer.fit_transform(df_cleaned[numeric_columns])
+    st.write("### Imputed Data")
+    st.dataframe(df_cleaned.head())
 
     # Step 7: Perform KS Test
     st.write("### Kolmogorov-Smirnov Test Results")
     ks_results = {}
     for column in trace_elements:
-        if column in df_cleaned.columns and column in df_final.columns:
-            ks_stat, p_value = ks_2samp(df_cleaned[column].dropna(), df_final[column].dropna())
-            ks_results[column] = {'KS Statistic': ks_stat, 'p-value': p_value}
+        if column in df_cleaned.columns:
+            original = df[column].dropna() if column in df else []
+            imputed = df_cleaned[column]
+            if len(original) > 0:
+                ks_stat, p_value = ks_2samp(original, imputed)
+                ks_results[column] = {'KS Statistic': ks_stat, 'p-value': p_value}
     ks_results_df = pd.DataFrame(ks_results).T
     st.write(ks_results_df)
-
-    # Validation 3: Highlight significant KS test results
-    significant_differences = [col for col, result in ks_results.items() if result['p-value'] < 0.05]
-    if significant_differences:
-        st.warning(f"Significant distribution differences detected in: {significant_differences}")
 
     # Step 8: Download Cleaned Dataset
     st.write("### Download Cleaned Dataset")
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df_final.to_excel(writer, index=False, sheet_name="Cleaned Data")
+        df_cleaned.to_excel(writer, index=False, sheet_name="Cleaned Data")
         writer.save()
     output.seek(0)
     st.download_button(
@@ -133,3 +102,5 @@ if uploaded_file:
 
 else:
     st.write("Please upload a dataset to start the cleaning process.")
+
+
