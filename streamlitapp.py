@@ -7,6 +7,7 @@ from scipy.stats import ks_2samp
 from sklearn.experimental import enable_iterative_imputer  # Enable IterativeImputer
 from sklearn.impute import IterativeImputer
 from sklearn.ensemble import RandomForestRegressor
+from io import BytesIO
 
 # App Title
 st.title("Eco Soil Insights AKL - Soil Data Cleaning Dashboard")
@@ -132,10 +133,14 @@ if uploaded_file:
 
     # Step 8: Download Cleaned Dataset
     st.write("### Download Cleaned Dataset")
-    cleaned_file = df_final.to_excel(index=False, engine="openpyxl")
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_final.to_excel(writer, index=False, sheet_name="Cleaned Data")
+        writer.save()
+    output.seek(0)
     st.download_button(
         label="Download Cleaned Dataset",
-        data=cleaned_file,
+        data=output,
         file_name="cleaned_soil_data.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
