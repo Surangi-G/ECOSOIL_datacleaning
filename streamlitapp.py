@@ -95,7 +95,7 @@ if uploaded_file:
     df_encoded = pd.get_dummies(df_for_imputation, columns=categorical_columns, drop_first=False)
 
     # Apply IterativeImputer for missing value imputation
-    imputer = IterativeImputer(max_iter=10, random_state=0)
+    imputer = IterativeImputer(max_iter=5, random_state=0)
     imputed_data = imputer.fit_transform(df_encoded)
     df_imputed = pd.DataFrame(imputed_data, columns=df_encoded.columns)
 
