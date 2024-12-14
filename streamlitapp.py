@@ -1,14 +1,10 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy.stats import ks_2samp
-from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.ensemble import RandomForestRegressor
+from scipy.stats import ks_2samp
 
 # App Title
 st.title("Eco Soil Insights AKL - Soil Data Cleaning Dashboard")
@@ -90,9 +86,10 @@ if uploaded_file:
     )
 
     # Impute missing values
-    numeric_columns = df_for_imputation.select_dtypes(include=['number']).columns
-    imputed_data = imputer.fit_transform(df_for_imputation[numeric_columns])
-    df_imputed = pd.DataFrame(imputed_data, columns=numeric_columns)
+    imputed_data = imputer.fit_transform(df_for_imputation)
+    df_imputed = pd.DataFrame(imputed_data, columns=df_for_imputation.columns)
+
+    # Reattach non-predictive columns to the imputed dataset
     df_final = pd.concat([df_cleaned[non_predictive_columns].reset_index(drop=True), df_imputed], axis=1)
     st.write("### Dataset After Imputation")
     st.dataframe(df_final.head())
@@ -100,22 +97,23 @@ if uploaded_file:
     # Step 7: Perform KS Test
     st.write("### Kolmogorov-Smirnov Test Results")
     ks_results = {}
-    for column in trace_elements:
+    for column in critical_columns:
         if column in df_cleaned.columns and column in df_final.columns:
-            original = df_cleaned[column].dropna().astype(float)
-            imputed = df_final[column].dropna().astype(float)
-            if not original.empty and not imputed.empty:
-                ks_stat, p_value = ks_2samp(original, imputed)
-                ks_results[column] = {'KS Statistic': ks_stat, 'p-value': p_value}
+            ks_stat, p_value = ks_2samp(df_cleaned[column].dropna(), df_final[column].dropna())
+            ks_results[column] = {'KS Statistic': ks_stat, 'p-value': p_value}
     ks_results_df = pd.DataFrame(ks_results).T
     st.write(ks_results_df)
+
+    # Validation 3: Highlight significant KS test results
+    significant_differences = [col for col, result in ks_results.items() if result['p-value'] < 0.05]
+    if significant_differences:
+        st.warning(f"Significant distribution differences detected in: {significant_differences}")
 
     # Step 8: Download Cleaned Dataset
     st.write("### Download Cleaned Dataset")
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df_final.to_excel(writer, index=False, sheet_name="Cleaned Data")
-        writer.save()
     output.seek(0)
     st.download_button(
         label="Download Cleaned Dataset",
@@ -126,4 +124,7 @@ if uploaded_file:
 
 else:
     st.write("Please upload a dataset to start the cleaning process.")
+
+
+
 
