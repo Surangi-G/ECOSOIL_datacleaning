@@ -1,12 +1,10 @@
-
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import ks_2samp
-from sklearn.experimental import enable_iterative_imputer  # Required to enable IterativeImputer
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import IterativeImputer
 
 # App Title
@@ -82,8 +80,8 @@ if uploaded_file:
     st.write("### Updated Columns After Handling '<' Values")
     st.dataframe(df_cleaned[trace_elements].head())
 
-    # Step 6: Impute Missing Values Using IterativeImputer
-    st.write("### Imputation Using IterativeImputer")
+    # Step 6: Impute Missing Values Using IterativeImputer with Random Forest
+    st.write("### Imputation Using IterativeImputer with Random Forest")
     non_predictive_columns = ['Site No.1', 'Site Num', 'Year', 'Sample Count', 'Period']
     df_for_imputation = df_cleaned.drop(columns=non_predictive_columns, errors="ignore")
 
@@ -94,8 +92,14 @@ if uploaded_file:
     # One-hot encode categorical variables
     df_encoded = pd.get_dummies(df_for_imputation, columns=categorical_columns, drop_first=False)
 
-    # Apply IterativeImputer for missing value imputation
-    imputer = IterativeImputer(max_iter=5, random_state=0)
+    # Use Random Forest as the estimator in IterativeImputer
+    imputer = IterativeImputer(
+        estimator=RandomForestRegressor(n_estimators=50, random_state=0),
+        max_iter=5,
+        random_state=0
+    )
+
+    # Impute missing values
     imputed_data = imputer.fit_transform(df_encoded)
     df_imputed = pd.DataFrame(imputed_data, columns=df_encoded.columns)
 
@@ -137,3 +141,4 @@ if uploaded_file:
 
 else:
     st.write("Please upload a dataset to start the cleaning process.")
+
