@@ -4,8 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import ks_2samp
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.experimental import enable_iterative_imputer  # Enable IterativeImputer
 from sklearn.impute import IterativeImputer
+from sklearn.ensemble import RandomForestRegressor
 
 # App Title
 st.title("Eco Soil Insights AKL - Soil Data Cleaning Dashboard")
@@ -141,4 +142,3 @@ if uploaded_file:
 
 else:
     st.write("Please upload a dataset to start the cleaning process.")
-
